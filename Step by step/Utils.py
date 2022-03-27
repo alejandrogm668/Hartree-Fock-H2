@@ -192,7 +192,7 @@ def electron_electron_repulsion(molecule):
 
 
 #####################################################################
-#                           PART4                                   #
+#                           PART5                                   #
 #####################################################################
 
 
@@ -211,3 +211,97 @@ def nuclear_nuclear_repulsion(atom_coords, Z):
                 E_NN += Z[i]*Z[j]/r_ij # Repulsion energy
                 
     return E_NN     
+
+
+
+
+
+
+#####################################################################
+#                           PART6                                   #
+#####################################################################
+
+
+
+def compute_G(density_matrix, V_ee):
+    
+    n_basis = density_matrix.shape[0] # Number of atomic/molecular orbitals
+    G = np.zeros((n_basis,n_basis))
+    
+    for i in range(n_basis):
+        for j in range(n_basis):
+            for k in range(n_basis):
+                for l in range(n_basis):
+                    J = V_ee[i,j,k,l]
+                    K = V_ee[i,l,k,j]
+                    G[i,j] += density_matrix[k,l] * (J-0.5*K)
+                    
+    return G                
+    
+
+def compute_density_matrix(MOs):
+    
+    n_basis = MOs.shape[0] # Number of atomic/molecular orbitals
+    density_matrix = np.zeros((n_basis,n_basis)) 
+     
+    for i in range(n_basis):
+        for j in range(n_basis):
+            for a in range(int(n_basis/2)):
+                C = MOs[i,a]
+                C_dagger = MOs[j,a]
+                density_matrix[i,j] += 2 * C_dagger * C  
+    
+    return density_matrix
+    
+
+def compute_electronic_energy(density_matrix, T, V_ne, G):
+    
+    n_basis = density_matrix.shape[0] # Number of atomic/molecular orbitals
+    H_core = T + V_ne # Core Hamiltonian
+    electronic_energy = 0.
+    
+    for i in range(n_basis):
+        for j in range(n_basis):
+            electronic_energy += density_matrix[i,j] * (H_core[i,j] + 0.5*G[i,j])             
+            
+    return electronic_energy
+    
+    
+
+def scf_cycle(molecular_terms, scf_parameters, molecule):
+    
+    S, T, V_ne, V_ee = molecular_terms # Terms contributing to electronic energy
+    tol, max_steps = scf_parameters # Tolerance and maximum number of scf cycles
+    electronic_energy = 0.
+    
+    n_basis = len(molecule) # Number of atomic/molecular orbitals
+    density_matrix = np.zeros((n_basis,n_basis))
+    
+    # 1. Enter into de SCF cycles
+    for scf_step in range(max_steps):
+        
+        electronic_energy_old = electronic_energy
+        
+        # 2. Compute the 2 electron terms and add them to the 1 electron term of HF equations
+        G = compute_G(density_matrix, V_ee)
+        
+        # 3. Build F, make S unit and get the eigenvalues/vectors from Roothan's equations
+        F = T + V_ne + G
+        S_inv_sqrt = linalg.sqrtm(linalg.inv(S)) # Matrix that converts S into I 
+        F_unitS = np.dot(np.transpose(S_inv_sqrt),np.dot(F,S_inv_sqrt)) # Transformation of F when S=I
+        eigvals, eigvecs = linalg.eigh(F_unitS) # Eigenvals/vecs of F when S=I
+        MOs = np.dot(S_inv_sqrt, eigvecs) # Returning to the solution when S =/= I
+        
+        # 4. Get a new density matrix from the MOs
+        density_matrix = compute_density_matrix(MOs)
+        
+        # 5. Compute electronic energy
+        electronic_energy = compute_electronic_energy(density_matrix, T, V_ne, G)
+        
+        # 6. Check convergence
+        if abs(electronic_energy-electronic_energy_old) < tol:
+            #print("SCF converged")
+            return electronic_energy
+        
+    #print("SCF not converged")    
+    return electronic_energy
