@@ -6,6 +6,7 @@
 
 import numpy as np 
 from scipy.special import erf
+from scipy import linalg
 
 #####################################################################
 #                           PART1                                   #
