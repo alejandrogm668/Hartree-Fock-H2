@@ -1,3 +1,4 @@
+#### Step 0: *Theory*
 #### Step 1: *Overlap Matrix*
 #### Step 2: *Kinetic Energy Matrix*
 #### Step 3: *Electron-Nuclear Attraction Matrix*
